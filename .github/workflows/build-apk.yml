@@ -1,4 +1,4 @@
-name: Build UTracker APK
+name: Build & Release UTracker (APK + Play Store AAB)
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   build:
-    name: Build & Release UTracker APK
+    name: Build APK & Play Store AAB
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -48,16 +48,23 @@ jobs:
         run: ./gradlew assembleMobileDebug --no-daemon
         working-directory: UpstoxMarketDataApp
 
-      - name: Prepare APK Release Asset
+      - name: Build Play Store Signed Release AAB (.aab)
+        run: ./gradlew bundleMobileRelease --no-daemon
+        working-directory: UpstoxMarketDataApp
+
+      - name: Prepare Release Assets
         run: |
           mkdir -p release_assets
           cp UpstoxMarketDataApp/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk release_assets/UTracker-mobile-debug.apk
+          cp UpstoxMarketDataApp/app/build/outputs/bundle/mobileRelease/app-mobile-release.aab release_assets/UTracker-release.aab
 
-      - name: Upload Artifact
+      - name: Upload Artifacts (APK & AAB)
         uses: actions/upload-artifact@v4
         with:
-          name: UTracker-mobile-debug
-          path: release_assets/UTracker-mobile-debug.apk
+          name: UTracker-Build-Artifacts
+          path: |
+            release_assets/UTracker-mobile-debug.apk
+            release_assets/UTracker-release.aab
           retention-days: 30
 
       - name: Determine Release Tag
@@ -76,7 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
-          name: "UTracker ${{ steps.release_info.outputs.tag }} — Automated Cloud Build"
+          name: "UTracker ${{ steps.release_info.outputs.tag }} — Cloud Build (APK + Play Store AAB)"
           body: |
             ### 🚀 UTracker Release (${{ steps.release_info.outputs.tag }})
             
@@ -84,12 +91,32 @@ jobs:
             Tap the link below to download and install directly on your phone:
             👉 **[Download UTracker-mobile-debug.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.release_info.outputs.tag }}/UTracker-mobile-debug.apk)**
             
+            **Google Play Store App Bundle (.aab):**
+            Download the signed release bundle for Google Play Console:
+            📦 **[Download UTracker-release.aab](https://github.com/${{ github.repository }}/releases/download/${{ steps.release_info.outputs.tag }}/UTracker-release.aab)**
+            
             ---
             ### 📦 Build Info:
             - **Commit**: `${{ github.sha }}`
             - **Run Number**: `#${{ github.run_number }}`
+            - **Package**: `com.UpstoxTracker.app`
+            - **Flavor**: `mobile`
             - **In-Place Update Version Code**: Auto-incremented for clean update over previous installations.
             - **Included**: Instant F&O auto-load, WebSocket streaming, pure yellow S/R touch glow, and Reset Ledger fix.
-          files: release_assets/UTracker-mobile-debug.apk
+          files: |
+            release_assets/UTracker-mobile-debug.apk
+            release_assets/UTracker-release.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Google Play Store (Optional Auto-Push)
+        if: env.PLAY_KEY != ''
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.UpstoxTracker.app
+          releaseFiles: release_assets/UTracker-release.aab
+          track: internal
+          status: completed
+        env:
+          PLAY_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
