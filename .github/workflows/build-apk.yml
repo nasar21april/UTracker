@@ -1,0 +1,95 @@
+name: Build UTracker APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g. v1.2, v1.3)'
+        required: false
+        default: 'v1.2'
+  push:
+    branches: [ main ]
+    tags:
+      - "v*"
+    paths:
+      - "UpstoxMarketDataApp/**"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release UTracker APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Auto-increment versionCode for In-Place Updates
+        run: |
+          BASE_CODE=25
+          RUN_NUM=${{ github.run_number }}
+          NEW_CODE=$((BASE_CODE + RUN_NUM))
+          echo "Setting versionCode to $NEW_CODE"
+          sed -i "s/versionCode = [0-9]*/versionCode = $NEW_CODE/" UpstoxMarketDataApp/app/build.gradle.kts
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+        working-directory: UpstoxMarketDataApp
+
+      - name: Build Mobile Debug APK
+        run: ./gradlew assembleMobileDebug --no-daemon
+        working-directory: UpstoxMarketDataApp
+
+      - name: Prepare APK Release Asset
+        run: |
+          mkdir -p release_assets
+          cp UpstoxMarketDataApp/app/build/outputs/apk/mobile/debug/app-mobile-debug.apk release_assets/UTracker-mobile-debug.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UTracker-mobile-debug
+          path: release_assets/UTracker-mobile-debug.apk
+          retention-days: 30
+
+      - name: Determine Release Tag
+        id: release_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v1.2"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Publish or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: "UTracker ${{ steps.release_info.outputs.tag }} — Automated Cloud Build"
+          body: |
+            ### 🚀 UTracker Release (${{ steps.release_info.outputs.tag }})
+            
+            **Direct Android APK Download:**
+            Tap the link below to download and install directly on your phone:
+            👉 **[Download UTracker-mobile-debug.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.release_info.outputs.tag }}/UTracker-mobile-debug.apk)**
+            
+            ---
+            ### 📦 Build Info:
+            - **Commit**: `${{ github.sha }}`
+            - **Run Number**: `#${{ github.run_number }}`
+            - **In-Place Update Version Code**: Auto-incremented for clean update over previous installations.
+            - **Included**: Instant F&O auto-load, WebSocket streaming, pure yellow S/R touch glow, and Reset Ledger fix.
+          files: release_assets/UTracker-mobile-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
