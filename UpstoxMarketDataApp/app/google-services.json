@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "693656157153",
+    "project_id": "swingscreener-3f83f",
+    "storage_bucket": "swingscreener-3f83f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:693656157153:android:b1f5da71f4b4ba5649b0a0",
+        "android_client_info": {
+          "package_name": "com.UpstoxTracker.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDia8grrB4vqtxCDMVRv2LUtZQwGhvlt4U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:693656157153:android:b1f5da71f4b4ba5649b0a0",
+        "android_client_info": {
+          "package_name": "com.UpstoxTracker.app.tv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDia8grrB4vqtxCDMVRv2LUtZQwGhvlt4U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

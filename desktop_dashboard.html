@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UTracker Pro — Desktop Market & Option Chain Dashboard</title>
+    <style>
+        :root {
+            --bg-main: #0B0E14;
+            --bg-card: #151922;
+            --bg-card-hover: #1E2430;
+            --border: #262D3D;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+            --bullish: #00E676;
+            --bearish: #FF5252;
+            --amber: #FFD600;
+            --primary: #38BDF8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Top Navigation Header */
+        header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 18px;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+        }
+
+        .brand-title {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #F1F5F9 0%, #38BDF8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            background: rgba(0, 230, 118, 0.1);
+            color: var(--bullish);
+            border: 1px solid rgba(0, 230, 118, 0.3);
+            border-radius: 20px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--bullish);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+
+        .time-box {
+            font-family: monospace;
+            font-size: 13px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        /* Main Layout Grid */
+        main {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 16px;
+            padding: 16px 24px;
+            flex: 1;
+        }
+
+        @media (max-width: 1100px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Left Column */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Index Tab Bar */
+        .index-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .index-tab {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .index-tab:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .index-tab.active {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.08);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+        }
+
+        .index-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .index-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .index-tab.active .index-name {
+            color: var(--primary);
+        }
+
+        .index-ltp {
+            font-size: 18px;
+            font-weight: 800;
+            margin-top: 4px;
+        }
+
+        .index-change {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Chart Canvas Card */
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 380px;
+            position: relative;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-title-box {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .chart-exec-info {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Option Chain Section */
+        .option-chain-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .st-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+
+        .st-left {
+            font-weight: 800;
+            font-size: 13px;
+            color: var(--amber);
+        }
+
+        .st-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        /* Option Table */
+        .chain-table-container {
+            overflow-x: auto;
+            max-height: 340px;
+        }
+
+        table.chain-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        table.chain-table th {
+            background: var(--bg-card-hover);
+            padding: 8px;
+            font-weight: 700;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        table.chain-table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        table.chain-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .strike-cell {
+            font-weight: 800;
+            color: var(--amber);
+            background: rgba(255, 214, 0, 0.05);
+            border-radius: 4px;
+        }
+
+        .ce-text { color: var(--bullish); font-weight: 700; }
+        .pe-text { color: var(--bearish); font-weight: 700; }
+
+        .btn-order {
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            font-size: 10px;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .btn-order:hover { opacity: 0.85; }
+        .btn-buy-ce { background: var(--bullish); color: #000; }
+        .btn-buy-pe { background: var(--bearish); color: #fff; }
+
+        /* Right Column: Ledger & Controls */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .btn-reset-ledger {
+            background: rgba(255, 82, 82, 0.15);
+            color: #FF8A80;
+            border: 1px solid rgba(255, 82, 82, 0.3);
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-reset-ledger:hover {
+            background: rgba(255, 82, 82, 0.3);
+            color: #fff;
+        }
+
+        .btn-squareoff {
+            background: rgba(255, 214, 0, 0.15);
+            color: var(--amber);
+            border: 1px solid rgba(255, 214, 0, 0.3);
+            border-radius: 6px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* Trade Ledger List */
+        .ledger-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 480px;
+            overflow-y: auto;
+        }
+
+        .ledger-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ledger-item-left {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .trade-title {
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-buy {
+            background: rgba(0, 230, 118, 0.2);
+            color: var(--bullish);
+            font-size: 9px;
+            font-weight: 800;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .badge-closed {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-size: 9px;
+            font-weight: 800;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .trade-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .trade-pnl {
+            font-size: 15px;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .empty-ledger {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 13px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+        }
+
+        /* PnL Footer Banner */
+        .pnl-footer-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-amount {
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1E293B;
+            color: #fff;
+            border-left: 4px solid var(--bullish);
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+
+        #toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand-container">
+            <div class="brand-logo">U</div>
+            <div>
+                <div class="brand-title">UTRACKER DESKTOP</div>
+                <div style="font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px;">REAL-TIME MARKET & OPTION CHAIN</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="status-badge">
+                <div class="pulse-dot"></div>
+                <span id="socketStatus">FEED LIVE</span>
+            </div>
+            <div class="time-box" id="clockBox">--:--:--</div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Left Column: Tabs, Chart & Option Chain -->
+        <div class="left-panel">
+            
+            <!-- Index Selector Tabs -->
+            <div class="index-tabs">
+                <div class="index-tab active" id="tabNifty" onclick="switchIndex('NIFTY')">
+                    <div class="index-header">
+                        <span class="index-name">NIFTY 50</span>
+                        <span class="index-change" id="niftyChange">--</span>
+                    </div>
+                    <div class="index-ltp" id="niftyLtp">--</div>
+                </div>
+
+                <div class="index-tab" id="tabBanknifty" onclick="switchIndex('BANKNIFTY')">
+                    <div class="index-header">
+                        <span class="index-name">BANK NIFTY</span>
+                        <span class="index-change" id="bankniftyChange">--</span>
+                    </div>
+                    <div class="index-ltp" id="bankniftyLtp">--</div>
+                </div>
+
+                <div class="index-tab" id="tabSensex" onclick="switchIndex('SENSEX')">
+                    <div class="index-header">
+                        <span class="index-name">SENSEX</span>
+                        <span class="index-change" id="sensexChange">--</span>
+                    </div>
+                    <div class="index-ltp" id="sensexLtp">--</div>
+                </div>
+            </div>
+
+            <!-- Dual-Layer Index Chart with Yellow S/R Touch Glow -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-box">
+                        <span class="chart-title" id="chartIndexTitle">NIFTY 50</span>
+                        <span class="chart-exec-info" id="chartExecInfo">Exec: ₹0 | Entry: -- | Qty: 0 | LTP: --</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted);">
+                        S/R Dynamic Ladder (Yellow on Touch)
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="indexChartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Option Chain Section -->
+            <div class="option-chain-card">
+                <div class="st-banner">
+                    <div class="st-left" id="bannerExecAmount">Exec: ₹0</div>
+                    <div class="st-right">
+                        <span style="color: var(--text-muted);">ST:</span>
+                        <span id="bannerStValue" style="color: var(--bullish);">UP (24,810.0)</span>
+                    </div>
+                </div>
+
+                <div class="chain-table-container">
+                    <table class="chain-table">
+                        <thead>
+                            <tr>
+                                <th>CALLS (BUY)</th>
+                                <th>CE LTP</th>
+                                <th>STRIKE</th>
+                                <th>PE LTP</th>
+                                <th>PUTS (BUY)</th>
+                                <th>TREND</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chainTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Ledger, Quick Order & Controls -->
+        <div class="right-panel">
+            
+            <!-- Quick Trade Panel -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Quick Trade Order</span>
+                    <span id="quickStrikeLabel" style="font-weight: 800; color: var(--primary); font-size: 12px;">ATM</span>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button class="btn-order btn-buy-ce" style="flex: 1; padding: 10px;" onclick="placeOrder('BUY', 'CE')">BUY CALL (CE)</button>
+                    <button class="btn-order btn-buy-pe" style="flex: 1; padding: 10px;" onclick="placeOrder('BUY', 'PE')">BUY PUT (PE)</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
+                    <span>Order Mode: <b style="color: var(--amber);">Virtual Paper</b></span>
+                    <span>Lots: <b>1 Lot</b></span>
+                </div>
+            </div>
+
+            <!-- Ledger Table -->
+            <div class="card" style="flex: 1;">
+                <div class="card-header">
+                    <span class="card-title">Trades Ledger</span>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn-squareoff" onclick="squareOffAll()">Square Off</button>
+                        <button class="btn-reset-ledger" onclick="resetLedger()" title="Clear all past trade data">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            Reset Ledger
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ledger-list" id="ledgerList">
+                    <div class="empty-ledger">No trades recorded yet.</div>
+                </div>
+            </div>
+
+            <!-- PnL Footer Banner -->
+            <div class="pnl-footer-card">
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">TOTAL REALIZED & ACTIVE P&L</div>
+                    <div class="footer-amount" id="totalPnlAmount" style="color: var(--bullish);">₹0.00</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: 700;">EXECUTED TURNOVER</div>
+                    <div style="font-size: 15px; font-weight: 800; color: var(--amber);" id="totalTurnoverAmount">₹0</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast Popup -->
+    <div id="toast">Ledger reset: All trade data wiped clean!</div>
+
+    <script>
+        // State variables
+        let activeIndex = 'NIFTY';
+        let quotesData = {};
+        let ledgerTrades = [];
+        let priceHistory = {
+            'NIFTY': [],
+            'BANKNIFTY': [],
+            'SENSEX': []
+        };
+
+        const lotSizes = { 'NIFTY': 65, 'BANKNIFTY': 30, 'SENSEX': 20 };
+        const strikeSteps = { 'NIFTY': 50, 'BANKNIFTY': 100, 'SENSEX': 100 };
+
+        // Support & Resistance levels generator based on base strike
+        function getSRLevels(base, step) {
+            return {
+                r2: base + step * 2,
+                r1: base + step * 1,
+                pivot: base,
+                s1: base - step * 1,
+                s2: base - step * 2
+            };
+        }
+
+        // Switch active index
+        function switchIndex(sym) {
+            activeIndex = sym;
+            document.querySelectorAll('.index-tab').forEach(el => el.classList.remove('active'));
+            if (sym === 'NIFTY') document.getElementById('tabNifty').classList.add('active');
+            if (sym === 'BANKNIFTY') document.getElementById('tabBanknifty').classList.add('active');
+            if (sym === 'SENSEX') document.getElementById('tabSensex').classList.add('active');
+
+            document.getElementById('chartIndexTitle').innerText = sym === 'NIFTY' ? 'NIFTY 50' : sym === 'BANKNIFTY' ? 'BANK NIFTY' : 'SENSEX';
+            updateUI();
+        }
+
+        // Show Toast
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 2500);
+        }
+
+        const API_BASE = window.location.protocol.startsWith('http') ? '' : 'http://localhost:8080';
+
+        // Reset Ledger
+        async function resetLedger() {
+            try {
+                const res = await fetch(`${API_BASE}/api/trades/clear`, { method: 'POST' });
+                const data = await res.json();
+                ledgerTrades = [];
+                updateUI();
+                showToast("Ledger reset: All past trade data wiped clean!");
+            } catch (e) {
+                console.error("Error clearing ledger:", e);
+                ledgerTrades = [];
+                updateUI();
+                showToast("Ledger reset: All past trade data wiped clean!");
+            }
+        }
+
+        // Square Off All
+        async function squareOffAll() {
+            try {
+                const res = await fetch(`${API_BASE}/api/trades/squareoff`, { method: 'POST' });
+                const data = await res.json();
+                if (data.trades) ledgerTrades = data.trades;
+                updateUI();
+                showToast("All active positions squared off!");
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Place simulated order
+        async function placeOrder(action, optType) {
+            const ltp = getCurrentLtp(activeIndex);
+            const step = strikeSteps[activeIndex] || 50;
+            const strike = Math.round(ltp / step) * step;
+            const qty = lotSizes[activeIndex] || 50;
+            const estPremium = Math.max(10, Math.round(Math.random() * 80 + 100)); // Estimated option premium
+
+            const trade = {
+                symbol: activeIndex,
+                optionType: optType,
+                strikePrice: strike,
+                action: action,
+                quantity: qty,
+                entryPrice: estPremium
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/trades/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(trade)
+                });
+                const data = await res.json();
+                if (data.trades) ledgerTrades = data.trades;
+                updateUI();
+                showToast(`Executed: ${action} ${qty} ${activeIndex} ${strike} ${optType} @ ₹${estPremium}`);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function getCurrentLtp(sym) {
+            const key = sym === 'NIFTY' ? 'NSE_INDEX:Nifty 50' : sym === 'BANKNIFTY' ? 'NSE_INDEX:Nifty Bank' : 'BSE_INDEX:SENSEX';
+            return quotesData[key]?.last_price || (sym === 'NIFTY' ? 24850 : sym === 'BANKNIFTY' ? 54200 : 81300);
+        }
+
+        // Fetch Live Quotes from server
+        async function fetchQuotes() {
+            try {
+                const res = await fetch(`${API_BASE}/api/quotes`);
+                const data = await res.json();
+                if (data.data) {
+                    quotesData = data.data;
+                    recordHistory();
+                }
+            } catch (e) {
+                console.warn("Using offline ticker:", e);
+            }
+            updateUI();
+        }
+
+        // Fetch Trades
+        async function fetchTrades() {
+            try {
+                const res = await fetch(`${API_BASE}/api/trades`);
+                const data = await res.json();
+                if (data.trades) {
+                    ledgerTrades = data.trades;
+                }
+            } catch (e) {}
+        }
+
+        function recordHistory() {
+            const now = Date.now();
+            ['NIFTY', 'BANKNIFTY', 'SENSEX'].forEach(sym => {
+                const ltp = getCurrentLtp(sym);
+                priceHistory[sym].push({ time: now, price: ltp });
+                if (priceHistory[sym].length > 60) priceHistory[sym].shift();
+            });
+        }
+
+        // Render Canvas Chart with Support/Resistance Yellow Touch Highlight
+        function renderChart() {
+            const canvas = document.getElementById('indexChartCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+            const width = rect.width;
+            const height = rect.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const ltp = getCurrentLtp(activeIndex);
+            const step = strikeSteps[activeIndex] || 50;
+            const baseStrike = Math.round(ltp / step) * step;
+            const sr = getSRLevels(baseStrike, step);
+
+            // Determine min and max scale
+            const allLevels = [sr.s2, sr.s1, sr.pivot, sr.r1, sr.r2, ltp];
+            const minP = Math.min(...allLevels) - step * 0.5;
+            const maxP = Math.max(...allLevels) + step * 0.5;
+            const rangeP = Math.max(maxP - minP, 1);
+
+            function getY(p) {
+                return height - 20 - ((p - minP) / rangeP) * (height - 40);
+            }
+
+            // Draw Subtle Grid
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 5; i++) {
+                const gy = 20 + i * ((height - 40) / 4);
+                ctx.beginPath();
+                ctx.moveTo(20, gy);
+                ctx.lineTo(width - 80, gy);
+                ctx.stroke();
+            }
+
+            // Draw Right-side Gauge Line
+            const gaugeX = width - 40;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(gaugeX, getY(sr.r2));
+            ctx.lineTo(gaugeX, getY(sr.s2));
+            ctx.stroke();
+
+            // Function to draw tick with PURE YELLOW highlight on touch
+            function drawTick(val, label, isSupport) {
+                const y = getY(val);
+                // Touch condition: LTP touches or crosses level
+                const isTouched = isSupport ? (ltp <= val || Math.abs(ltp - val) <= 1.5) : (ltp >= val || Math.abs(ltp - val) <= 1.5);
+
+                if (isTouched) {
+                    // PURE YELLOW GLOW (#FFD600)
+                    ctx.save();
+                    ctx.strokeStyle = "rgba(255, 214, 0, 0.4)";
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(gaugeX - 16, y);
+                    ctx.lineTo(gaugeX + 16, y);
+                    ctx.stroke();
+
+                    // Sharp yellow line
+                    ctx.strokeStyle = "#FFD600";
+                    ctx.lineWidth = 3.5;
+                    ctx.beginPath();
+                    ctx.moveTo(gaugeX - 12, y);
+                    ctx.lineTo(gaugeX + 12, y);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#FFD600";
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.textAlign = "right";
+                    ctx.fillText(`${val} (${label})`, gaugeX - 16, y + 4);
+                    ctx.restore();
+                } else {
+                    // Default subtle tick
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(gaugeX - 8, y);
+                    ctx.lineTo(gaugeX + 8, y);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+                    ctx.font = "10px sans-serif";
+                    ctx.textAlign = "right";
+                    ctx.fillText(`${val}`, gaugeX - 12, y + 3);
+                }
+            }
+
+            drawTick(sr.r2, "R2", false);
+            drawTick(sr.r1, "R1", false);
+            drawTick(sr.s1, "S1", true);
+            drawTick(sr.s2, "S2", true);
+
+            // Draw Price Curve on Left Plot Area
+            const history = priceHistory[activeIndex] || [];
+            if (history.length > 1) {
+                const plotW = width - 100;
+                ctx.beginPath();
+                history.forEach((pt, idx) => {
+                    const px = 20 + (idx / (history.length - 1)) * plotW;
+                    const py = getY(pt.price);
+                    if (idx === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.strokeStyle = "#38BDF8";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+
+            // Draw Live LTP Line
+            const ltpY = getY(ltp);
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = ltp >= baseStrike ? "#00E676" : "#FF5252";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(20, ltpY);
+            ctx.lineTo(gaugeX - 10, ltpY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // LTP Bubble on Gauge
+            ctx.fillStyle = ltp >= baseStrike ? "#00E676" : "#FF5252";
+            ctx.beginPath();
+            ctx.arc(gaugeX, ltpY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Update Option Chain Table
+        function renderOptionChain() {
+            const tbody = document.getElementById('chainTableBody');
+            if (!tbody) return;
+
+            const ltp = getCurrentLtp(activeIndex);
+            const step = strikeSteps[activeIndex] || 50;
+            const baseStrike = Math.round(ltp / step) * step;
+
+            let html = '';
+            for (let i = -5; i <= 5; i++) {
+                const strike = baseStrike + i * step;
+                const isAtm = (i === 0);
+                const ceLtp = Math.max(5, Math.round(Math.max(10, (ltp - strike) + 80)));
+                const peLtp = Math.max(5, Math.round(Math.max(10, (strike - ltp) + 80)));
+
+                html += `
+                    <tr style="${isAtm ? 'background: rgba(56, 189, 248, 0.08);' : ''}">
+                        <td><button class="btn-order btn-buy-ce" onclick="placeOrder('BUY', 'CE')">BUY</button></td>
+                        <td class="ce-text">${ceLtp.toFixed(1)}</td>
+                        <td class="strike-cell">${strike} ${isAtm ? '<span style="font-size: 9px; color: var(--primary);">ATM</span>' : ''}</td>
+                        <td class="pe-text">${peLtp.toFixed(1)}</td>
+                        <td><button class="btn-order btn-buy-pe" onclick="placeOrder('BUY', 'PE')">BUY</button></td>
+                        <td style="font-weight: 700; color: ${ceLtp > peLtp ? 'var(--bullish)' : 'var(--bearish)'};">
+                            ${ceLtp > peLtp ? 'UP' : 'DOWN'}
+                        </td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = html;
+        }
+
+        // Update Ledger UI
+        function renderLedger() {
+            const list = document.getElementById('ledgerList');
+            const totalPnlEl = document.getElementById('totalPnlAmount');
+            const totalTurnoverEl = document.getElementById('totalTurnoverAmount');
+            const chartExecInfo = document.getElementById('chartExecInfo');
+            const bannerExecAmount = document.getElementById('bannerExecAmount');
+
+            if (!ledgerTrades || ledgerTrades.length === 0) {
+                list.innerHTML = '<div class="empty-ledger">No trades recorded yet.</div>';
+                totalPnlEl.innerText = "₹0.00";
+                totalPnlEl.style.color = "var(--bullish)";
+                totalTurnoverEl.innerText = "₹0";
+                chartExecInfo.innerText = "Exec: ₹0 | Entry: -- | Qty: 0 | LTP: --";
+                bannerExecAmount.innerText = "Exec: ₹0";
+                return;
+            }
+
+            let totalPnl = 0;
+            let totalTurnover = 0;
+            let activeTradesForChart = [];
+
+            let html = '';
+            ledgerTrades.forEach(trade => {
+                const currentPrice = trade.isClosed ? trade.exitPrice : trade.currentPrice;
+                const multiplier = trade.action === 'BUY' ? 1 : -1;
+                const pnl = (currentPrice - trade.entryPrice) * trade.quantity * multiplier;
+                totalPnl += pnl;
+
+                const executedAmount = trade.entryPrice * trade.quantity;
+                totalTurnover += executedAmount;
+
+                if (!trade.isClosed && trade.indexSymbol === activeIndex) {
+                    activeTradesForChart.push(trade);
+                }
+
+                html += `
+                    <div class="ledger-item">
+                        <div class="ledger-item-left">
+                            <div class="trade-title">
+                                <span class="badge-buy">${trade.action}</span>
+                                <span>${trade.indexSymbol} ${trade.strikePrice} ${trade.optionType}</span>
+                                ${trade.isClosed ? '<span class="badge-closed">CLOSED</span>' : ''}
+                            </div>
+                            <div class="trade-sub">
+                                Entry: ₹${trade.entryPrice.toFixed(2)} | Qty: ${trade.quantity} | Cur: ₹${currentPrice.toFixed(2)}
+                            </div>
+                        </div>
+                        <div class="trade-pnl" style="color: ${pnl >= 0 ? 'var(--bullish)' : 'var(--bearish)'};">
+                            ${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+            totalPnlEl.innerText = `${totalPnl >= 0 ? '+' : ''}₹${totalPnl.toFixed(2)}`;
+            totalPnlEl.style.color = totalPnl >= 0 ? "var(--bullish)" : "var(--bearish)";
+            totalTurnoverEl.innerText = `₹${Math.round(totalTurnover).toLocaleString('en-IN')}`;
+
+            // Update Chart & Banner Executed Info
+            if (activeTradesForChart.length > 0) {
+                const activeTurnover = activeTradesForChart.reduce((acc, t) => acc + (t.entryPrice * t.quantity), 0);
+                const totalQty = activeTradesForChart.reduce((acc, t) => acc + t.quantity, 0);
+                const avgEntry = activeTurnover / totalQty;
+                const avgLtp = activeTradesForChart.reduce((acc, t) => acc + (t.currentPrice * t.quantity), 0) / totalQty;
+                chartExecInfo.innerText = `Exec: ₹${Math.round(activeTurnover).toLocaleString('en-IN')} | Entry: ${avgEntry.toFixed(2)} | Qty: ${totalQty} | LTP: ${avgLtp.toFixed(2)}`;
+                bannerExecAmount.innerText = `Exec: ₹${Math.round(activeTurnover).toLocaleString('en-IN')}`;
+            } else {
+                chartExecInfo.innerText = `Exec: ₹0 | Entry: -- | Qty: 0 | LTP: --`;
+                bannerExecAmount.innerText = `Exec: ₹0`;
+            }
+        }
+
+        // Master UI update loop
+        function updateUI() {
+            // Update Tab cards
+            const nifty = getCurrentLtp('NIFTY');
+            const bnf = getCurrentLtp('BANKNIFTY');
+            const sensex = getCurrentLtp('SENSEX');
+
+            document.getElementById('niftyLtp').innerText = nifty.toLocaleString('en-IN');
+            document.getElementById('bankniftyLtp').innerText = bnf.toLocaleString('en-IN');
+            document.getElementById('sensexLtp').innerText = sensex.toLocaleString('en-IN');
+
+            document.getElementById('niftyChange').innerText = "+0.45%";
+            document.getElementById('niftyChange').style.color = "var(--bullish)";
+            document.getElementById('bankniftyChange').innerText = "+0.28%";
+            document.getElementById('bankniftyChange').style.color = "var(--bullish)";
+            document.getElementById('sensexChange').innerText = "+0.32%";
+            document.getElementById('sensexChange').style.color = "var(--bullish)";
+
+            document.getElementById('quickStrikeLabel').innerText = `${Math.round(getCurrentLtp(activeIndex) / (strikeSteps[activeIndex] || 50)) * (strikeSteps[activeIndex] || 50)} ATM`;
+
+            renderChart();
+            renderOptionChain();
+            renderLedger();
+        }
+
+        // Live Clock
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clockBox').innerText = d.toLocaleTimeString('en-US', { hour12: false });
+        }, 1000);
+
+        // Fetch loop
+        fetchQuotes();
+        fetchTrades();
+        setInterval(fetchQuotes, 2000);
+        setInterval(fetchTrades, 3000);
+        window.addEventListener('resize', renderChart);
+    </script>
+</body>
+</html>

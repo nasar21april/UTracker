@@ -1,0 +1,350 @@
+fun DualLayerIndexChart(
+    sym: String,
+    optionsChain: Map<String, StrikeRowState>,
+    candles: List<com.example.upstoxmarketdataapp.data.Candle>,
+    futures: List<com.example.upstoxmarketdataapp.data.FutureData>?,
+    pivots: Map<String, PivotCalculator.Pivots>?,
+    upstoxService: UpstoxService
+) {
+    val labels = upstoxService.strikeLabels
+    val isDark = MaterialTheme.colorScheme.onBackground == Color.White
+    
+    // Smooth autoscale state
+    var maxAbs by remember { mutableStateOf(10.0) }
+    var lastExpandTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(optionsChain, sym) {
+        var currentMax = 1.0
+        for (lbl in labels) {
+            val key = "${sym}_$lbl"
+            val row = optionsChain[key] ?: continue
+            val ceD = Math.abs(row.ceDiff)
+            val peD = Math.abs(row.peDiff)
+            if (ceD > currentMax) currentMax = ceD
+            if (peD > currentMax) currentMax = peD
+        }
+        val targetMax = currentMax + 1.5
+        val now = System.currentTimeMillis()
+
+        if (targetMax > maxAbs) {
+            maxAbs = targetMax
+            lastExpandTime = now
+        } else if (now - lastExpandTime > 8000) {
+            maxAbs = (1.0 - 0.15) * maxAbs + 0.15 * targetMax
+        }
+    }
+
+    val padBottom = maxAbs * 0.1
+    val padTop = maxAbs * 0.25
+    val minY = -(maxAbs + padBottom)
+    val maxY = maxAbs + padTop
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+        val paddingX = 40f
+        val paddingY = 40f
+        val paddingLeft = 140f
+        val paddingRight = 130f
+
+        val plotWidth = width - paddingLeft - paddingRight
+        val plotHeight = height - 2 * paddingY
+
+        // ============================================================
+        // LAYER 1: Background 1-Minute Index Price Candles (Low Opacity)
+        // ============================================================
+        if (candles.isNotEmpty()) {
+            val minPrice = candles.minOf { it.low }
+            val maxPrice = candles.maxOf { it.high }
+            val priceRange = if (maxPrice > minPrice) maxPrice - minPrice else 1.0
+            
+            // Add padding to price scale
+            val chartMinPrice = minPrice - priceRange * 0.05
+            val chartMaxPrice = maxPrice + priceRange * 0.05
+            val priceSpan = chartMaxPrice - chartMinPrice
+
+            fun getPriceY(price: Double): Float {
+                val frac = (price - chartMinPrice) / priceSpan
+                return (height - paddingY - frac * plotHeight).toFloat()
+            }
+
+            val candleWidth = plotWidth / candles.size
+            
+            for (idx in candles.indices) {
+                val candle = candles[idx]
+                val cx = paddingX + idx * candleWidth + (candleWidth / 2f)
+                val yHigh = getPriceY(candle.high)
+                val yLow = getPriceY(candle.low)
+                val yOpen = getPriceY(candle.open)
+                val yClose = getPriceY(candle.close)
+
+                val color = if (candle.close >= candle.open) {
+                    androidx.compose.ui.graphics.Color(0xFF00E676).copy(alpha = 0.10f) // Bullish candle - 30% opacity
+                } else {
+                    androidx.compose.ui.graphics.Color(0xFFFF5252).copy(alpha = 0.10f) // Bearish candle - 30% opacity
+                }
+
+                // Draw wick
+                drawLine(
+                    color = if (isDark) Color.LightGray.copy(alpha = 0.10f) else Color.DarkGray.copy(alpha = 0.10f),
+                    start = Offset(cx, yHigh),
+                    end = Offset(cx, yLow),
+                    strokeWidth = 1f
+                )
+
+                // Draw body
+                val bodyTop = minOf(yOpen, yClose)
+                val bodyBottom = maxOf(yOpen, yClose)
+                val bodyHeight = maxOf(Math.abs(yClose - yOpen), 1f)
+                
+                drawRect(
+                    color = color,
+                    topLeft = Offset(cx - (candleWidth * 0.4f), bodyTop),
+                    size = androidx.compose.ui.geometry.Size(candleWidth * 0.8f, bodyHeight)
+                )
+            }
+
+            // Draw Dashed Support & Resistance Pivot lines on the background price scale!
+            val ladder = upstoxService.pivotLadderMap[sym]
+            val sup = ladder?.support
+            val res = ladder?.resistance
+            val dashPath = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
+
+            val srLabelPaint = Paint().apply {
+                textSize = 17f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+                isAntiAlias = true
+            }
+
+            val ltpLinePaint = Paint().apply {
+                textSize = 17f
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+                isAntiAlias = true
+            }
+
+            var supY: Float? = null
+            var resY: Float? = null
+            var ltpY: Float? = null
+
+            // Determine LTP and Candle Color
+            val lastCandle = candles.lastOrNull()
+            if (lastCandle != null && lastCandle.close in chartMinPrice..chartMaxPrice) {
+                ltpY = getPriceY(lastCandle.close)
+                val isBullish = lastCandle.close >= lastCandle.open
+                ltpLinePaint.color = if (isBullish) android.graphics.Color.parseColor("#00E676") else android.graphics.Color.parseColor("#FF5252")
+                
+                // Draw LTP line indicator
+                drawLine(
+                    color = if (isBullish) androidx.compose.ui.graphics.Color(0xFF00E676).copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color(0xFFFF5252).copy(alpha = 0.6f),
+                    start = Offset(width - paddingRight - 6f, ltpY),
+                    end = Offset(width - paddingRight, ltpY),
+                    strokeWidth = 1.5f
+                )
+            }
+
+            if (sup != null && sup in chartMinPrice..chartMaxPrice) {
+                supY = getPriceY(sup)
+                drawLine(
+                    color = androidx.compose.ui.graphics.Color(0xFFFF1744),
+                    start = Offset(paddingLeft, supY),
+                    end = Offset(width - paddingRight - 6f, supY),
+                    strokeWidth = 2f,
+                    pathEffect = dashPath
+                )
+            }
+
+            if (res != null && res in chartMinPrice..chartMaxPrice) {
+                resY = getPriceY(res)
+                drawLine(
+                    color = androidx.compose.ui.graphics.Color(0xFF00E676),
+                    start = Offset(paddingLeft, resY),
+                    end = Offset(width - paddingRight - 6f, resY),
+                    strokeWidth = 2f,
+                    pathEffect = dashPath
+                )
+            }
+
+            // Draw Labels (Overlap Avoidance)
+            val labelX = width - paddingRight + 20f
+            var labelSupY = supY
+            var labelResY = resY
+            val labelLtpY = ltpY
+
+            // Simple push-away logic from LTP
+            if (labelLtpY != null) {
+                if (labelSupY != null && Math.abs(labelLtpY - labelSupY) < 20f) {
+                    labelSupY = if (labelSupY > labelLtpY) labelLtpY + 20f else labelLtpY - 20f
+                }
+                if (labelResY != null && Math.abs(labelLtpY - labelResY) < 20f) {
+                    labelResY = if (labelResY > labelLtpY) labelLtpY + 20f else labelLtpY - 20f
+                }
+            }
+            if (labelSupY != null && labelResY != null && Math.abs(labelSupY - labelResY) < 20f) {
+                if (labelSupY > labelResY) labelSupY += 10f else labelSupY -= 10f
+            }
+
+            if (labelSupY != null) {
+                srLabelPaint.color = android.graphics.Color.parseColor("#FF1744")
+                drawContext.canvas.nativeCanvas.drawText("S ${sup?.toInt()}", labelX, labelSupY + 6f, srLabelPaint)
+            }
+            if (labelResY != null) {
+                srLabelPaint.color = android.graphics.Color.parseColor("#00E676")
+                drawContext.canvas.nativeCanvas.drawText("R ${res?.toInt()}", labelX, labelResY + 6f, srLabelPaint)
+            }
+            if (labelLtpY != null) {
+                drawContext.canvas.nativeCanvas.drawText(lastCandle?.close?.toInt().toString(), labelX, labelLtpY + 6f, ltpLinePaint)
+            }
+        }
+
+        // Draw last ticker time on top right
+        val timeText = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(System.currentTimeMillis()))
+        val timePaint = android.graphics.Paint().apply {
+            color = if (isDark) android.graphics.Color.LTGRAY else android.graphics.Color.DKGRAY
+            textSize = 20f
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.RIGHT
+        }
+        drawContext.canvas.nativeCanvas.drawText(timeText, width - 10f, 30f, timePaint)
+
+        // ============================================================
+        // LAYER 2: Foreground Options Calculation Lines, Zero Line, Dots
+        // ============================================================
+        fun getCoordY(value: Double): Float {
+            val yFraction = (value - minY) / (maxY - minY)
+            return (height - paddingY - yFraction * plotHeight).toFloat()
+        }
+
+        val zeroY = getCoordY(0.0)
+
+        // Calculate Watermark Logic conditions for Futures
+        var greenFuturesCount = 0
+        var redFuturesCount = 0
+        if (futures != null && futures.isNotEmpty()) {
+            for (f in futures) {
+                if (f.diff >= 0) greenFuturesCount++ else redFuturesCount++
+            }
+        }
+        val allFuturesGreen = (futures != null && futures.isNotEmpty() && greenFuturesCount == futures.size)
+        val allFuturesRed = (futures != null && futures.isNotEmpty() && redFuturesCount == futures.size)
+
+        // ============================================================
+        // LAYER 1.5: Futures (Vertical bars on the left edge based on diff)
+        // ============================================================
+        if (futures != null && futures.isNotEmpty()) {
+            val futurePaintBase = android.graphics.Paint().apply {
+                textSize = 18f
+                isAntiAlias = true
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+                textAlign = android.graphics.Paint.Align.LEFT
+            }
+            
+            // X positions for the 3 futures
+            val futureStartX = 25f
+            val futureSpacing = 30f
+            
+            val sortedFutures = futures.reversed()
+            val maxFutureAbs = sortedFutures.maxOfOrNull { Math.abs(it.diff) } ?: 1.0
+            val scaleFactor = if (maxFutureAbs > maxY) (maxY * 0.9) / maxFutureAbs else 1.0
+            
+            // Draw "FUT" title
+            val futuresTitlePaint = android.graphics.Paint().apply {
+                color = if (isDark) android.graphics.Color.parseColor("#444444") else android.graphics.Color.parseColor("#CCCCCC") // very light and dull
+                textSize = 14f
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.LEFT
+                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+            }
+            drawContext.canvas.nativeCanvas.drawText("FUT", futureStartX, 30f, futuresTitlePaint)
+            
+            for (i in 0 until minOf(3, sortedFutures.size)) {
+                val fut = sortedFutures[i]
+                val xPos = futureStartX + (i * futureSpacing)
+                
+                val startY = zeroY
+                val scaledDiff = fut.diff * scaleFactor
+                var endY = getCoordY(scaledDiff)
+                
+                // Cap futures top margin to avoid hitting "Futures" text
+                val minFuturesY = 50f
+                if (endY < minFuturesY) endY = minFuturesY
+                
+                val isPositive = fut.diff >= 0
+                val col = if (isPositive) androidx.compose.ui.graphics.Color(0xFF00E676) else androidx.compose.ui.graphics.Color(0xFFFF5252)
+                
+                // Draw vertical thick line (bar)
+                drawLine(
+                    color = col,
+                    start = Offset(xPos, startY),
+                    end = Offset(xPos, endY),
+                    strokeWidth = 20f,
+                    alpha = 0.6f
+                )
+                
+                val futPaint = android.graphics.Paint(futurePaintBase).apply {
+                    color = if (isDark) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                }
+                
+                val roundedDiff = Math.abs(kotlin.math.round(fut.diff).toInt())
+                val diffStr = "$roundedDiff"
+                
+                // Rotate canvas 90 degrees to draw text vertically
+                drawContext.canvas.nativeCanvas.save()
+                
+                val textX = xPos
+                // Anchor text above/below the bar appropriately
+                val textY = if (isPositive) endY - 15f else endY + 25f
+                
+                drawContext.canvas.nativeCanvas.rotate(-90f, textX, textY)
+                val textOffsetY = textY + (futPaint.textSize / 3f)
+                drawContext.canvas.nativeCanvas.drawText(diffStr, textX, textOffsetY, futPaint)
+                drawContext.canvas.nativeCanvas.restore()
+            }
+        }
+
+        // Zero baseline
+        drawLine(
+            color = Color.Gray.copy(alpha = 0.5f),
+            start = Offset(paddingLeft, zeroY),
+            end = Offset(width - paddingRight, zeroY),
+            strokeWidth = 1.5f
+        )
+
+        val cePoints = mutableListOf<Offset>()
+        val pePoints = mutableListOf<Offset>()
+        val strikeXCoords = mutableListOf<Float>()
+        val strikeValuesText = mutableListOf<String>()
+
+        val strikeCount = labels.size
+        val xStep = plotWidth / (strikeCount - 1)
+
+        var buyCallDots = 0
+        var buyPutDots = 0
+        var ceDiffPositiveCount = 0
+        var peDiffPositiveCount = 0
+
+        // Find max Net OI Change magnitude to scale baseline dots beautifully
+        val maxNetOiChange = labels.maxOfOrNull { lbl ->
+            val row = optionsChain["${sym}_$lbl"]
+            Math.abs(row?.netOiChange ?: 0.0)
+        } ?: 1.0
+
+        for (i in labels.indices) {
+            val lbl = labels[i]
+            val key = "${sym}_$lbl"
+            val row = optionsChain[key]
+            val ceDiff = row?.ceDiff ?: 0.0
+            val peDiff = row?.peDiff ?: 0.0
+            
+            if (ceDiff > 0) ceDiffPositiveCount++
+            if (peDiff > 0) peDiffPositiveCount++
+
+            val x = paddingLeft + i * xStep
+            strikeXCoords.add(x)
+            cePoints.add(Offset(x, getCoordY(ceDiff)))
+            pePoints.add(Offset(x, getCoordY(peDiff)))
+
+            // Strike labels
+            val strikeText = row?.strikePrice?.toInt()?.toString() ?: ""
+            // Hide alternate strikes, but ensure center is visible

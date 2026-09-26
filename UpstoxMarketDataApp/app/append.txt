@@ -1,0 +1,105 @@
+
+@Composable
+fun GlobalTradeButtonsRow(
+    optionsChain: Map<String, com.example.upstoxmarketdataapp.data.StrikeRowState>,
+    indexFutures: Map<String, List<com.example.upstoxmarketdataapp.data.FutureState>>,
+    upstoxService: com.example.upstoxmarketdataapp.data.UpstoxService
+) {
+    var globalMaxFuturesSum by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0.0) }
+    var globalMinFuturesSum by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0.0) }
+
+    val indices = listOf("NIFTY", "BANKNIFTY", "SENSEX")
+
+    var allBuyCe = true
+    var allBuyPe = true
+    var currentFuturesSum = 0.0
+    var totalCallDots = 0
+    var totalPutDots = 0
+
+    indices.forEach { sym ->
+        val futures = indexFutures[sym] ?: emptyList()
+        val allFuturesGreen = futures.isNotEmpty() && futures.all { it.diff >= 0 }
+        val allFuturesRed = futures.isNotEmpty() && futures.all { it.diff < 0 }
+
+        val labels = upstoxService.getValidStrikeLabels(sym)
+        val strikeCount = labels.size
+        val threshold80Percent = (strikeCount * 0.8).toInt()
+
+        var buyCallDots = 0
+        var buyPutDots = 0
+        var ceDiffPositiveCount = 0
+        var peDiffPositiveCount = 0
+
+        labels.forEach { lbl ->
+            val row = optionsChain["${sym}_$lbl"]
+            if (row != null) {
+                if (row.ceDiff > 0) ceDiffPositiveCount++
+                if (row.peDiff > 0) peDiffPositiveCount++
+
+                val signal = row.activeSignal
+                if (signal != null) {
+                    if (signal.type == "BUY CALL") buyCallDots++
+                    if (signal.type == "BUY PUT") buyPutDots++
+                }
+            }
+        }
+
+        val isBuyCe = allFuturesGreen && buyCallDots >= 3 && buyPutDots == 0 && ceDiffPositiveCount >= threshold80Percent
+        val isBuyPe = allFuturesRed && buyPutDots >= 3 && buyCallDots == 0 && peDiffPositiveCount >= threshold80Percent
+
+        if (!isBuyCe) allBuyCe = false
+        if (!isBuyPe) allBuyPe = false
+
+        currentFuturesSum += futures.sumOf { it.diff }
+        totalCallDots += buyCallDots
+        totalPutDots += buyPutDots
+    }
+
+    // Track peaks for exhaustion logic
+    androidx.compose.runtime.LaunchedEffect(currentFuturesSum) {
+        if (currentFuturesSum > globalMaxFuturesSum) globalMaxFuturesSum = currentFuturesSum
+        if (currentFuturesSum < globalMinFuturesSum) globalMinFuturesSum = currentFuturesSum
+    }
+
+    // Exit CE Logic (Momentum Exhaustion): Futures dropping heavily from peak (>20% drop) AND dots flattening (< 6 total)
+    val exitCe = (globalMaxFuturesSum > 100 && currentFuturesSum < globalMaxFuturesSum * 0.8 && totalCallDots < 6)
+    // Exit PE Logic: Futures rising from trough AND red dots flattening
+    val exitPe = (globalMinFuturesSum < -100 && currentFuturesSum > globalMinFuturesSum * 0.8 && totalPutDots < 6)
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(containerColor = if (allBuyCe) androidx.compose.ui.graphics.Color(0xFF00E676) else androidx.compose.ui.graphics.Color.DarkGray),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 4.dp).height(40.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) { Text("BUY CE", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(containerColor = if (exitCe) androidx.compose.ui.graphics.Color(0xFFFFB300) else androidx.compose.ui.graphics.Color.DarkGray),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 4.dp).height(40.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) { Text("EXIT CE", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(containerColor = if (allBuyPe) androidx.compose.ui.graphics.Color(0xFFFF5252) else androidx.compose.ui.graphics.Color.DarkGray),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 4.dp).height(40.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) { Text("BUY PE", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+
+        Button(
+            onClick = {},
+            colors = ButtonDefaults.buttonColors(containerColor = if (exitPe) androidx.compose.ui.graphics.Color(0xFFFFB300) else androidx.compose.ui.graphics.Color.DarkGray),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 4.dp).height(40.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) { Text("EXIT PE", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+    }
+}

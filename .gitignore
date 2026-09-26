@@ -1,0 +1,38 @@
+# Android Build & SDK
+**/android-sdk/
+**/build/
+**/.gradle/
+**/local.properties
+**/.cxx/
+**/captures/
+
+# IDE files
+**/.idea/
+**/.vscode/
+*.iml
+
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+**/.venv/
+**/venv/
+**/env/
+
+# OS & Logs
+*.log
+Thumbs.db
+.DS_Store
+
+# Large Binaries & Archives
+*.apk
+*.zip
+*.tar.gz
+
+# Temporary Debug Captures & Dumps
+/*.xml
+/*.txt
+/phone_*.png
+/screen*.png
+/s.png
+/shortcut_dialog.png
