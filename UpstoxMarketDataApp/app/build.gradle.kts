@@ -12,8 +12,8 @@ android {
         applicationId = "com.UpstoxTracker.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 25
-        versionName = "1.2.4"
+        versionCode = 26
+        versionName = "1.2.5"
     }
     
     flavorDimensions.add("device")

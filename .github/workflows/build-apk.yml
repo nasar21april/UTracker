@@ -34,7 +34,7 @@ jobs:
 
       - name: Auto-increment versionCode for In-Place Updates
         run: |
-          BASE_CODE=25
+          BASE_CODE=26
           RUN_NUM=${{ github.run_number }}
           NEW_CODE=$((BASE_CODE + RUN_NUM))
           echo "Setting versionCode to $NEW_CODE"
